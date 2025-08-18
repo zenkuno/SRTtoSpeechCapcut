@@ -8,29 +8,37 @@ import shutil
 from . import capcut_config
 
 class CapcutAPIClient:
-    def __init__(self, create_config_path, query_config_path, session=None):
-        """
-        Khởi tạo client API CapCut.
-        :param create_config_path: Đường dẫn đến file cấu hình cho endpoint tạo task.
-        :param query_config_path: Đường dẫn đến file cấu hình cho endpoint query task.
-        :param session: Một requests.Session có sẵn (tùy chọn).
-        """
-        self.create_config_path = create_config_path
-        self.query_config_path = query_config_path
+    def __init__(self, create_config, query_config, session=None, is_file_path=True):
         self.session = session if session else requests.Session()
-        print(f"CapcutAPIClient initialized with create_config: {create_config_path}, query_config: {query_config_path}")
+        
+        create_content = ""
+        query_content = ""
 
+        if is_file_path:
+            print(f"CapcutAPIClient: Đang nạp cấu hình từ các file: {create_config}, {query_config}")
+            if not os.path.exists(create_config):
+                raise FileNotFoundError(f"File cấu hình không tồn tại: {create_config}")
+            if not os.path.exists(query_config):
+                raise FileNotFoundError(f"File cấu hình không tồn tại: {query_config}")
+            with open(create_config, 'r', encoding='utf-8') as f:
+                create_content = f.read()
+            with open(query_config, 'r', encoding='utf-8') as f:
+                query_content = f.read()
+        else:
+            print("CapcutAPIClient: Đang nạp cấu hình từ nội dung text trong bộ nhớ.")
+            create_content = create_config
+            query_content = query_config
 
-    def _load_request_config(self, filepath):
-        """Đọc URL và headers từ file cấu hình."""
-        if not os.path.exists(filepath):
-            print(f"LỖI (CapcutAPIClient): File cấu hình không tồn tại: {filepath}")
-            raise FileNotFoundError(f"File cấu hình không tồn tại: {filepath}")
+        self.create_url, self.create_headers = self._parse_config_content(create_content, "Create")
+        self.query_url, self.query_headers = self._parse_config_content(query_content, "Query")
+        
+        print("CapcutAPIClient initialized successfully.")
+
+    def _parse_config_content(self, content, config_name=""):
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                lines = [line.strip() for line in f.readlines() if line.strip()]
+            lines = [line.strip() for line in content.splitlines() if line.strip()]
             if not lines:
-                raise ValueError(f"File cấu hình {filepath} trống.")
+                raise ValueError(f"Nội dung cấu hình {config_name} trống.")
 
             url = lines[0]
             headers = {}
@@ -40,22 +48,12 @@ class CapcutAPIClient:
                     headers[key.strip()] = value.strip()
             return url, headers
         except Exception as e:
-            print(f"LỖI (CapcutAPIClient): Lỗi khi đọc file cấu hình {filepath}: {e}")
+            print(f"LỖI (CapcutAPIClient): Lỗi khi phân tích nội dung cấu hình {config_name}: {e}")
             raise
 
-
     def create_tts_task(self, text, speaker_id, speaker_name_friendly):
-        """
-        Gửi yêu cầu tạo task TTS.
-        Trả về task_id nếu thành công, None nếu thất bại.
-        """
         print(f"API_CLIENT: Creating TTS task for text: \"{text[:30]}...\", speaker: {speaker_id}")
-        try:
-            url, headers = self._load_request_config(self.create_config_path)
-        except Exception as e:
-            print(f"API_CLIENT_ERROR (create_tts_task): Không thể tải cấu hình create. {e}")
-            return None
-
+        
         req_json_obj = {
             "speaker": speaker_id,
             "audio_config": {},
@@ -63,7 +61,6 @@ class CapcutAPIClient:
         }
         params_obj = {
             "text": text,
-            #"breaks": [],
             "platform": 1
         }
         try:
@@ -82,7 +79,7 @@ class CapcutAPIClient:
         }
 
         try:
-            response = self.session.post(url, headers=headers, json=body, timeout=30)
+            response = self.session.post(self.create_url, headers=self.create_headers, json=body, timeout=30)
             response.raise_for_status()
             response_data = response.json()
             
@@ -108,17 +105,7 @@ class CapcutAPIClient:
 
 
     def query_tts_task(self, task_id):
-        """
-        Query trạng thái của một task TTS.
-        Trả về một dict {'status': '...', 'audio_url': '...', 'raw_response': ...}
-        Status có thể là: 'PROCESSING', 'SUCCESS', 'FAILED', 'UNKNOWN'.
-        """
         print(f"API_CLIENT: Querying task ID: {task_id}")
-        try:
-            url, headers = self._load_request_config(self.query_config_path)
-        except Exception as e:
-            print(f"API_CLIENT_ERROR (query_tts_task): Không thể tải cấu hình query. {e}")
-            return {'status': 'CONFIG_ERROR', 'audio_url': None, 'raw_response': None}
 
         body = {
             "task_id": task_id,
@@ -126,7 +113,7 @@ class CapcutAPIClient:
         }
 
         try:
-            response = self.session.post(url, headers=headers, json=body, timeout=30)
+            response = self.session.post(self.query_url, headers=self.query_headers, json=body, timeout=30)
             response.raise_for_status()
             response_data = response.json()
             print(f"API_CLIENT: Query response (raw): {str(response_data)[:200]}...")
@@ -166,12 +153,7 @@ class CapcutAPIClient:
             print(f"API_CLIENT_ERROR (query_tts_task - Unknown): {e}")
             return {'status': 'UNKNOWN_ERROR', 'audio_url': None, 'raw_response': None}
 
-
     def poll_for_audio_url(self, task_id, max_retries=None, poll_interval_sec=None):
-        """
-        Thực hiện polling (blocking) để lấy URL audio.
-        Trả về audio_url nếu thành công, None nếu thất bại/timeout.
-        """
         max_r = max_retries if max_retries is not None else capcut_config.DEFAULT_MAX_POLL_RETRIES
         interval = poll_interval_sec if poll_interval_sec is not None else capcut_config.DEFAULT_POLL_INTERVAL_SEC
         
@@ -201,10 +183,6 @@ class CapcutAPIClient:
 
 
     def download_audio(self, audio_url, output_filepath):
-        """
-        Tải file audio từ URL về đường dẫn chỉ định.
-        Trả về True nếu thành công, False nếu thất bại.
-        """
         print(f"API_CLIENT: Downloading audio from {audio_url} to {output_filepath}")
         try:
             response = self.session.get(audio_url, stream=True, timeout=60)
@@ -227,10 +205,7 @@ class CapcutAPIClient:
     def get_audio_file(self, text, speaker_id, speaker_name_friendly, 
                        output_dir, filename_prefix="tts_", 
                        max_poll_retries=None, poll_interval_sec=None):
-        """
-        Hàm tiện ích cấp cao: tạo task, poll, download và trả về đường dẫn file.
-        Trả về đường dẫn file audio đã tải, hoặc None nếu có lỗi.
-        """
+
         print(f"API_CLIENT (get_audio_file): Processing text: \"{text[:30]}...\"")
         task_id = self.create_tts_task(text, speaker_id, speaker_name_friendly)
         if not task_id:
@@ -258,7 +233,6 @@ class CapcutAPIClient:
             return None
 
     def close_session(self):
-        """Đóng requests.Session nếu nó được quản lý bởi client này."""
         if self.session:
             self.session.close()
 
