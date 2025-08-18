@@ -5,9 +5,6 @@ import os
 import time
 import shutil
 
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 from . import capcut_config
 
 class CapcutAPIClient:
@@ -85,7 +82,7 @@ class CapcutAPIClient:
         }
 
         try:
-            response = self.session.post(url, headers=headers, json=body, timeout=30, verify=False)
+            response = self.session.post(url, headers=headers, json=body, timeout=30)
             response.raise_for_status()
             response_data = response.json()
             
@@ -129,7 +126,7 @@ class CapcutAPIClient:
         }
 
         try:
-            response = self.session.post(url, headers=headers, json=body, timeout=30, verify=False)
+            response = self.session.post(url, headers=headers, json=body, timeout=30)
             response.raise_for_status()
             response_data = response.json()
             print(f"API_CLIENT: Query response (raw): {str(response_data)[:200]}...")
@@ -210,7 +207,7 @@ class CapcutAPIClient:
         """
         print(f"API_CLIENT: Downloading audio from {audio_url} to {output_filepath}")
         try:
-            response = self.session.get(audio_url, stream=True, timeout=60, verify=False)
+            response = self.session.get(audio_url, stream=True, timeout=60)
             response.raise_for_status()
             
             os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
@@ -264,4 +261,5 @@ class CapcutAPIClient:
         """Đóng requests.Session nếu nó được quản lý bởi client này."""
         if self.session:
             self.session.close()
+
             print("API_CLIENT: Requests session closed.")
