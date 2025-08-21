@@ -11,7 +11,7 @@ DEFAULT_POLL_INTERVAL_SEC = 5
 # --- Speaker Voices ---
 CAPCUT_SPEAKERS = {
     "BV421_vivn_streaming": "Nguồn nhỏ ngọt ngào",
-    "BV074_streaming": "Giọng nữ dễ thương",
+    "BV074_streaming": "Cô gái hoạt ngôn",
     "BV075_streaming": "Thanh niên tự tin",
     "BV560_streaming": "Anh Dũng",
     "BV562_streaming": "Chí Mai (nữ)",
@@ -25,4 +25,5 @@ def get_default_speaker_id():
     return DEFAULT_SPEAKER_ID
 
 def get_default_speaker_name():
+
     return CAPCUT_SPEAKERS.get(DEFAULT_SPEAKER_ID, "Không rõ")
