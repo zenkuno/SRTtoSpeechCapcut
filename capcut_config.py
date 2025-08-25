@@ -30,3 +30,4 @@ def get_default_speaker_name():
 
     return CAPCUT_SPEAKERS.get(DEFAULT_SPEAKER_ID, "Không rõ")
 
+
