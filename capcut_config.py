@@ -16,8 +16,8 @@ CAPCUT_SPEAKERS = {
     "BV560_streaming": "Anh Dũng",
     "BV562_streaming": "Chí Mai (nữ)",
     "vi_female_huong": "Giọng nữ phổ thông",
-    "vi-VN-HoaiMyNeural": "Hoài My",
-    "vi-VN-NamMinhNeural": "Nam Minh"
+    #"vi-VN-HoaiMyNeural": "Hoài My",
+    #"vi-VN-NamMinhNeural": "Nam Minh"
 }
 
 def get_speaker_name(speaker_id):
@@ -29,5 +29,6 @@ def get_default_speaker_id():
 def get_default_speaker_name():
 
     return CAPCUT_SPEAKERS.get(DEFAULT_SPEAKER_ID, "Không rõ")
+
 
 
